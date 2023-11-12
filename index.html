@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        /* CSS untuk tombol */
+        .centered-buttons {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh; /* Mengisi seluruh tinggi viewport */
+        }
+        body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    background: url(background.jpg);
+    height: 100vh;
+    }
+
+        .custom-button {
+            background-color: #42474a; /* Warna latar belakang */
+            color: #fff; /* Warna teks */
+            padding: 15px 30px; /* Padding tombol */
+            border: none;
+            border-radius: 5px; /* Sudut bulat */
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin: 4px 0; /* Jarak antara tombol */
+            cursor: pointer;
+            transition: background-color 0.3s; /* Transisi saat kursor diarahkan */
+        }
+
+        .custom-button:hover {
+            background-color: #2980b9; /* Warna latar belakang saat diarahkan kursor */
+        }
+    </style>
+</head>
+<body>
+    <div class="centered-buttons">
+        <a href="chess.html" class="custom-button">MULAI GAME</a>
+        <a href="rules.html" class="custom-button">ATURAN BERMAIN</a>
+    </div>
+</body>
+</html>

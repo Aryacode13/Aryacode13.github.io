@@ -1,10 +1,23 @@
 let boardSquaresArray = [];
+let moves=[];
+const castlingSquares=["g1","g8","c1","c8"];
 let isWhiteTurn = true;
-let whiteKingSquare="e1";
-let blackKingSquare="e8";
 const boardSquares = document.getElementsByClassName("square");
 const pieces = document.getElementsByClassName("piece");
 const piecesImages = document.getElementsByTagName("img");
+
+setupBoardSquares();
+setupPieces();
+fillBoardSquaresArray();
+function makeMove(startingSquareId,destinationSquareId,pieceType,pieceColor,captured) {
+  moves.push({
+    from: startingSquareId,
+    to: destinationSquareId,
+    pieceType: pieceType,
+    pieceColor:pieceColor,
+    captured: captured
+});
+}
 
 function fillBoardSquaresArray() {
   const boardSquares = document.getElementsByClassName("square");
@@ -62,9 +75,6 @@ function deepCopyArray(array){
   });
   return arrayCopy;
 }
-setupBoardSquares();
-setupPieces();
-fillBoardSquaresArray();
 
 function setupBoardSquares() {
   for (let i = 0; i < boardSquares.length; i++) {
@@ -76,6 +86,52 @@ function setupBoardSquares() {
     square.id = column + row;
   }
 }
+
+function performCastling(piece,pieceColor,startingSquareId,destinationSquareId,boardSquaresArray){
+  let rookId,rookDetinationSquareId,checkSquareId;
+  if(destinationSquareId=="g1"){
+    rookId="rookh1";
+    rookDetinationSquareId="f1";
+    checkSquareId="f1";
+  }
+  else if(destinationSquareId=="c1"){
+    rookId="rooka1";
+    rookDetinationSquareId="d1";
+    checkSquareId="d1";
+  }
+  else if(destinationSquareId=="g8"){
+    rookId="rookh8";
+    rookDetinationSquareId="f8";
+    checkSquareId="f8";
+  }
+  else if(destinationSquareId=="c8"){
+    rookId="rooka8";
+    rookDetinationSquareId="d8";
+    checkSquareId="d8";
+  }
+  if(isKingInCheck(checkSquareId,pieceColor,boardSquaresArray))return;
+  let rook=document.getElementById(rookId);
+  let rookDetinationSquare=document.getElementById(rookDetinationSquareId);
+  rookDetinationSquare.appendChild(rook);
+  updateBoardSquaresArray(
+    rook.id.slice(-2),
+    rookDetinationSquare.id,
+    boardSquaresArray
+  );
+  const destinationSquare=document.getElementById(destinationSquareId);
+  destinationSquare.appendChild(piece);
+  isWhiteTurn=!isWhiteTurn;
+  updateBoardSquaresArray(
+    startingSquareId,
+    destinationSquareId,
+    boardSquaresArray
+  );
+  let captured=false;
+  makeMove(startingSquareId,destinationSquareId,"king",pieceColor,captured);
+  checkForCheckMate();
+  return;
+}
+
 function setupPieces() {
   for (let i = 0; i < pieces.length; i++) {
     pieces[i].addEventListener("dragstart", drag);
@@ -122,7 +178,7 @@ function drop(ev) {
   const pieceType = piece.classList[1];
   
   const destinationSquare = ev.currentTarget;
-  let   destinationSquareId = destinationSquare.id;
+  let destinationSquareId = destinationSquare.id;
 
   legalSquares=isMoveValidAgainstCheck(legalSquares,startingSquareId,pieceColor,pieceType);
 
@@ -133,7 +189,7 @@ function drop(ev) {
       boardSquaresArray
     );
     if (isCheck) return;
-    isWhiteTurn  ? (whiteKingSquare=destinationSquareId) : (blackKingSquare=destinationSquareId);
+    
   }
 
     let squareContent=getPieceAtSquare(destinationSquareId,boardSquaresArray);
@@ -141,6 +197,14 @@ function drop(ev) {
      squareContent.pieceColor == "blank" &&
      legalSquares.includes(destinationSquareId)
   ) {
+    let isCheck=false;
+    if(pieceType=="king")
+    isCheck=isKingInCheck(startingSquareId,pieceColor,boardSquaresArray);
+    if(pieceType=="king" && !kingHasMoved(pieceColor) && castlingSquares.includes(destinationSquareId)&& !isCheck){
+      performCastling(piece,pieceColor,startingSquareId,destinationSquareId,boardSquaresArray);
+      return;
+    }
+    if(pieceType=="king" && !kingHasMoved(pieceColor) && castlingSquares.includes(destinationSquareId)&& isCheck) return;
     destinationSquare.appendChild(piece);
     isWhiteTurn = !isWhiteTurn;
     updateBoardSquaresArray(
@@ -148,6 +212,8 @@ function drop(ev) {
       destinationSquareId,
       boardSquaresArray
     );
+    let captured=false;
+    makeMove(startingSquareId,destinationSquareId,pieceType,pieceColor,captured);
     checkForCheckMate();
     return;
   }
@@ -170,8 +236,10 @@ function drop(ev) {
       startingSquareId,
       destinationSquareId,
       boardSquaresArray
-    );
-    checkForCheckMate();
+    );     
+    let captured=true;
+    makeMove(startingSquareId,destinationSquareId,pieceType,pieceColor,captured);
+      checkForCheckMate();
     return;
   }
 }
@@ -434,8 +502,65 @@ function getKingMoves(startingSquareId, pieceColor,boardSquaresArray) {
       legalSquares.push(String.fromCharCode(currentFile + 97) + currentRank);
     }
   });
+  let shortCastleSquare=isShortCastlePossible(pieceColor,boardSquaresArray);
+  let longCastleSquare=isLongCastlePossible(pieceColor,boardSquaresArray);
+  if(shortCastleSquare!="blank")legalSquares.push(shortCastleSquare);
+  if(longCastleSquare!="blank")legalSquares.push(longCastleSquare);
+
   return legalSquares;
 }
+
+function isShortCastlePossible(pieceColor,boardSquaresArray) {
+  let rank = pieceColor === "white" ? "1" : "8";
+  let fSquare=boardSquaresArray.find(element=>element.squareId===`f${rank}`);
+  let gSquare=boardSquaresArray.find(element=>element.squareId===`g${rank}`);
+  if(fSquare.pieceColor !=="blank" || gSquare.pieceColor!=="blank" || kingHasMoved(pieceColor)||rookHasMoved(pieceColor,`h${rank}`)){
+    return "blank";
+  }
+  return `g${rank}`;
+}
+
+function isLongCastlePossible(pieceColor,boardSquaresArray){
+  let rank = pieceColor === "white" ? "1" : "8";
+  let dSquare=boardSquaresArray.find(element=>element.squareId===`d${rank}`);
+  let cSquare=boardSquaresArray.find(element=>element.squareId===`c${rank}`);
+  let bSquare=boardSquaresArray.find(element=>element.squareId===`b${rank}`);
+
+  if(dSquare.pieceColor !=="blank" || cSquare.pieceColor!=="blank"||bSquare.pieceColor!=="blank" || kingHasMoved(pieceColor)||rookHasMoved(pieceColor,`a${rank}`)){
+    return "blank";
+  }
+  return `c${rank}`;
+}
+function kingHasMoved(pieceColor){
+  let result=moves.find((element)=>(element.pieceColor===pieceColor)&&(element.pieceType==="king"));
+  if(result!=undefined) return true;
+  return false;
+}
+function rookHasMoved(pieceColor,startingSquareId){
+  let result=moves.find((element)=>(element.pieceColor===pieceColor)&&(element.pieceType==="rook")&&(element.from==startingSquareId));
+  if(result!=undefined) return true;
+  return false;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 function moveToEighthRank(startingSquareId, pieceColor, boardSquaresArray) {
   const file = startingSquareId.charAt(0);
@@ -634,54 +759,57 @@ function getPieceAtSquare(squareId, boardSquaresArray) {
   return { pieceColor: color, pieceType: pieceType,pieceId:pieceId};
 }
 
-function isKingInCheck(squareId,pieceColor,boardSquaresArray) {
+function isKingInCheck(squareId,pieceColor,boardSquaresArray){
   let legalSquares=getRookMoves(squareId,pieceColor,boardSquaresArray);
-  for (let squareId of legalSquares) {
-    let pieceProperties = getPieceAtSquare(squareId,boardSquaresArray);
+  for (let squareId of legalSquares){
+    let pieceProperties=getPieceAtSquare(squareId,boardSquaresArray);
     if(
-      (pieceProperties.pieceType=="rook" ||
-      pieceProperties.pieceType=="queen") &&
-      pieceColor!=pieceProperties.pieceColor
-    ) return true;
+      (pieceProperties.pieceType=="rook" ||pieceProperties.pieceType=="queen" )&& pieceColor!=pieceProperties.pieceColor
+    ) 
+    return true;
   }
-  legalSquares=getBishopMoves(squareId,pieceColor,boardSquaresArray);
-  for (let squareId of legalSquares) {
-    let pieceProperties = getPieceAtSquare(squareId,boardSquaresArray);
+     legalSquares=getBishopMoves(squareId,pieceColor,boardSquaresArray);
+  for (let squareId of legalSquares){
+    let pieceProperties=getPieceAtSquare(squareId,boardSquaresArray);
     if(
-      (pieceProperties.pieceType=="bishop" ||
-      pieceProperties.pieceType=="queen") &&
-      pieceColor!=pieceProperties.pieceColor
-    ) return true;
+      (pieceProperties.pieceType=="bishop" ||pieceProperties.pieceType=="queen" )&& pieceColor!=pieceProperties.pieceColor
+    ) 
+    return true;
+  }
+    legalSquares=getKnightMoves(squareId,pieceColor,boardSquaresArray);
+  for (let squareId of legalSquares){
+    let pieceProperties=getPieceAtSquare(squareId,boardSquaresArray);
+    if(
+      (pieceProperties.pieceType=="knight" )&& pieceColor!=pieceProperties.pieceColor
+    ) 
+    return true;
   }
    legalSquares=checkPawnDiagonalCaptures(squareId,pieceColor,boardSquaresArray);
-  for (let squareId of legalSquares) {
-    let pieceProperties = getPieceAtSquare(squareId,boardSquaresArray);
+  for (let squareId of legalSquares){
+    let pieceProperties=getPieceAtSquare(squareId,boardSquaresArray);
     if(
-      (pieceProperties.pieceType=="pawn") &&
-      pieceColor!=pieceProperties.pieceColor
-    ) return true;
+      (pieceProperties.pieceType=="pawn" )&& pieceColor!=pieceProperties.pieceColor
+    ) 
+    return true;
   }
-  legalSquares=getKnightMoves(squareId,pieceColor,boardSquaresArray);
-  for (let squareId of legalSquares) {
-    let pieceProperties = getPieceAtSquare(squareId,boardSquaresArray);
+   legalSquares=getKingMoves(squareId,pieceColor,boardSquaresArray);
+  for (let squareId of legalSquares){
+    let pieceProperties=getPieceAtSquare(squareId,boardSquaresArray);
     if(
-      (pieceProperties.pieceType=="knight") &&
-      pieceColor!=pieceProperties.pieceColor
-    ) return true;
-  }
-  legalSquares=getKingMoves(squareId,pieceColor,boardSquaresArray);
-  for (let squareId of legalSquares) {
-    let pieceProperties = getPieceAtSquare(squareId,boardSquaresArray);
-    if(
-      (pieceProperties.pieceType=="king") &&
-      pieceColor!=pieceProperties.pieceColor
-    ) return true;
+      (pieceProperties.pieceType=="king" )&& pieceColor!=pieceProperties.pieceColor
+    ) 
+    return true;
   }
   return false;
 }
-
+function getkingLastMove(color){
+  let kingLastMove=moves.find(element=>element.pieceType==="king"&&element.pieceColor===color);
+  if(kingLastMove==undefined)
+  return isWhiteTurn ? "e1" : "e8";
+  return kingLastMove.to;
+}
 function isMoveValidAgainstCheck(legalSquares,startingSquareId,pieceColor,pieceType){
-  let kingSquare=isWhiteTurn ? whiteKingSquare : blackKingSquare;
+  let kingSquare=isWhiteTurn ? getkingLastMove("white") : getkingLastMove("black");
   let boardSquaresArrayCopy=deepCopyArray(boardSquaresArray);
   let legalSquaresCopy = legalSquares.slice();
   legalSquaresCopy.forEach((element)=>{
@@ -699,7 +827,7 @@ function isMoveValidAgainstCheck(legalSquares,startingSquareId,pieceColor,pieceT
 }
 
 function checkForCheckMate(){
-  let kingSquare=isWhiteTurn ?whiteKingSquare:blackKingSquare;
+  let kingSquare=isWhiteTurn ? getkingLastMove("white") : getkingLastMove("black");
   let pieceColor=isWhiteTurn ? "white" : "black";
   let boardSquaresArrayCopy=deepCopyArray(boardSquaresArray);
   let kingIsCheck=isKingInCheck(kingSquare,pieceColor,boardSquaresArrayCopy);
@@ -730,5 +858,5 @@ function showAlert(message) {
 
   setTimeout(function(){
      alert.style.display="none";
-  },3000);
+  },3000);
 }
